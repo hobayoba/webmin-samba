@@ -3,10 +3,13 @@ services:
   webmin-samba:
     image: kvvtest100/webmin-samba:07.02.2023
     ports:
-      - 8080:80
+      - 80:80
       - 139:139
       - 445:445
     volumes:
-      - ./storage:/media/storage
+      - ./data:/data
+      - ./backup_configs:/backup_configs
     environment:
-      URL: yes
+      - WEBMIN_PASSWORD=webmin1
+      - WEBMIN_URL=/webmintest
+      - REDIRECT_PORT=80
