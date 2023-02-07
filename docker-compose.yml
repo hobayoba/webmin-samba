@@ -1,0 +1,12 @@
+version: '3'
+services:
+  webmin-samba:
+    image: kvvtest100/webmin-samba:07.02.2023
+    ports:
+      - 8080:80
+      - 139:139
+      - 445:445
+    volumes:
+      - ./storage:/media/storage
+    environment:
+      URL: yes
