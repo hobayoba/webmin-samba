@@ -38,13 +38,13 @@ service webmin start
 service smbd start
 service nmbd start
 
+rm -rf /backup_configs/webmin_prev /backup_configs/samba_prev
+mv /backup_configs/webmin /backup_configs/webmin_prev 2>/dev/null
+mv /backup_configs/samba  /backup_configs/samba_prev 2>/dev/null
+cp -r /etc/webmin /backup_configs/
+cp -r /etc/samba  /backup_configs/
+
 while true; do
-   # cleanup & backup
-   rm -rf /backup_configs/webmin_prev /backup_configs/samba_prev
-   mv /backup_configs/webmin /backup_configs/webmin_prev 2>/dev/null
-   mv /backup_configs/samba  /backup_configs/samba_prev 2>/dev/null
-   cp -r /etc/webmin /backup_configs/
-   cp -r /etc/samba  /backup_configs/
    # check services
    service webmin status || service webmin start
    service nginx  status || service nginx  start
