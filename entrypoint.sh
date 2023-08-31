@@ -3,19 +3,19 @@
 export BACKUP_RESTORED=false
 # try to restore backups on first run
 for I in {0..14}; do
-  if [[ -d /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago") ]]; then
-    echo "INFO: found backups, restoring"
+  if ls /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")* >/dev/null 2>&1; then
+    export BDT=$(date +'%Y.%m.%d_00' -d"${I} day ago")
+    export BACKUP_DIR=$(ls -d /backup_configs/${BDT}*)
+    echo "INFO: found backups, restoring from ${BACKUP_DIR}"
     rm -rf /etc/webmin /etc/samba /etc/nginx
-    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/webmin /etc/webmin
-    chown root:bin -R /etc/webmin
-    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/samba  /etc/samba
-    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/nginx  /etc/nginx
-    find /etc/samba  -type d | xargs -I {} chmod 755 {}
-    find /etc/webmin -type d | xargs -I {} chmod 755 {}
-    find /etc/nginx  -type d | xargs -I {} chmod 755 {}
-    find /etc/samba  -type f | xargs -I {} chmod 644 {}
-    find /etc/webmin -type f | xargs -I {} chmod 644 {}
-    find /etc/nginx  -type f | xargs -I {} chmod 644 {}
+    cp -r ${BACKUP_DIR}/webmin ${BACKUP_DIR}/samba ${BACKUP_DIR}/nginx /etc/
+#    find /etc/samba  -type d | xargs -I {} chmod 755 {}
+#    find /etc/samba  -type f | xargs -I {} chmod 644 {}
+#    find /etc/webmin -type d | xargs -I {} chmod 755 {}
+#    find /etc/webmin -type f | xargs -I {} chmod 644 {}
+#    find /etc/nginx  -type d | xargs -I {} chmod 755 {}
+#    find /etc/nginx  -type f | xargs -I {} chmod 644 {}
+#    chown root:bin -R /etc/webmin
     export BACKUP_RESTORED=true
     echo "INFO: backup restored"
     break
@@ -66,9 +66,9 @@ passwd -d guest
 echo root:${WEBMIN_PASSWORD} | chpasswd
 
 service nginx start
-service webmin start
 service smbd start
 service nmbd start
+service webmin start
 
 while true; do
    # check or start services
@@ -76,10 +76,10 @@ while true; do
    service nginx  status >/dev/null || service nginx  start
    service smbd   status >/dev/null || service smbd   start
    service nmbd   status >/dev/null || service nmbd   start
-   if [[ "$(date +'%Y.%m.%d_%H')" == "$(date +'%Y.%m.%d_00')" ]] && [[ ! -d /backup_configs/$(date +'%Y.%m.%d_00') ]]; then
+   if [[ "$(date +'%Y.%m.%d_%H')" == "$(date +'%Y.%m.%d_00')" ]] && ! ls /backup_configs/$(date +'%Y.%m.%d_00')* >/dev/null 2>&1; then
      echo "INFO: backing up configs"
      # clean up old backups
-     find /backup_configs -type d -mtime +14 -delete
+     find /backup_configs -type d -maxdepth 1 -mtime +14 -delete
      # make backups
      DT=$(date +'%Y.%m.%d_%H.%M.%S')
      mkdir -p /backup_configs/${DT}

@@ -39,7 +39,7 @@ spec:
               protocol: TCP
           env:
             - name: WEBMIN_PASSWORD
-              value: nifisamba
+              value: samba
             - name: WEBMIN_URL
               value: /webmin
             - name: REDIRECT_PORT
@@ -62,11 +62,11 @@ spec:
               mountPath: /backup_configs
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           securityContext:
             runAsUser: 0
       restartPolicy: Always
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 5
       dnsPolicy: ClusterFirst
       serviceAccountName: YOUR_NAMESPACE-sa-ns-admin
       serviceAccount: YOUR_NAMESPACE-sa-ns-admin

@@ -7,6 +7,7 @@ ENV WEBMIN_URL=/
 ENV REDIRECT_PORT=80
 ENV DATA_PATH=/data
 ENV SHARES_LIST=PassingBy,InProgress,Processed
+ENV DEBIAN_FRONTEND=noninteractive
 
 # backup configs
 VOLUME /backup_configs
@@ -17,8 +18,8 @@ WORKDIR /
 
 RUN \
 apt-get update -qqq >/dev/null && \
-apt-get install apt-transport-https apt-utils \
-    curl \
+apt-get install apt-transport-https apt-utils -yqqq >/dev/null && \
+apt-get install curl \
     samba \
     samba-common \
     nginx -yqqq >/dev/null

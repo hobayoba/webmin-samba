@@ -23,5 +23,5 @@ Example:
 ### Latest image
 
 ```
-
+kvvtest100/webmin-samba:31.08.2023-v1
 ```
