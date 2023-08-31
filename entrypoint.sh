@@ -1,36 +1,68 @@
 #!/bin/bash
 
-# restore configs
-ls /backup_configs/webmin >/dev/null 2>&1 && cp -r /backup_configs/webmin /etc/webmin
-ls /backup_configs/samba  >/dev/null 2>&1 && cp -r /backup_configs/samba  /etc/samba
+export BACKUP_RESTORED=false
+# try to restore backups on first run
+for I in {0..14}; do
+  if [[ -d /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago") ]]; then
+    echo "INFO: found backups, restoring"
+    rm -rf /etc/webmin /etc/samba /etc/nginx
+    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/webmin /etc/webmin
+    chown root:bin -R /etc/webmin
+    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/samba  /etc/samba
+    cp -r /backup_configs/$(date +'%Y.%m.%d_00' -d"${I} day ago")/nginx  /etc/nginx
+    find /etc/samba  -type d | xargs -I {} chmod 755 {}
+    find /etc/webmin -type d | xargs -I {} chmod 755 {}
+    find /etc/nginx  -type d | xargs -I {} chmod 755 {}
+    find /etc/samba  -type f | xargs -I {} chmod 644 {}
+    find /etc/webmin -type f | xargs -I {} chmod 644 {}
+    find /etc/nginx  -type f | xargs -I {} chmod 644 {}
+    export BACKUP_RESTORED=true
+    echo "INFO: backup restored"
+    break
+  fi;
+done
 
-# set predefined values
-sed -i 's/referers_none=1/referers_none=0/' /etc/webmin/config
-sed -i 's/10000/8080/'                      /etc/webmin/miniserv.conf
-sed -i 's/ssl=1/ssl=0/'                     /etc/webmin/miniserv.conf
+if ! $BACKUP_RESTORED; then
+  echo "INFO: preconfigure services"
 
-# clean up before set new values
-sed -i '/webprefix=/d'         /etc/webmin/config
-sed -i '/webprefixnoredir==/d' /etc/webmin/config
-sed -i '/redirect_prefix=/d'   /etc/webmin/miniserv.conf
-sed -i '/ncookiepath=/d'       /etc/webmin/miniserv.conf
-sed -i '/redirect_port=/d'     /etc/webmin/miniserv.conf
+  sed -i -E "s|/default_data_path|${DATA_PATH}|" /etc/samba/smb.conf
 
-if [[ "${WEBMIN_URL}" != "" ]]; then
-  echo -e "webprefix=${WEBMIN_URL}\nwebprefixnoredir=1"             >> /etc/webmin/config
-  echo -e "redirect_prefix=${WEBMIN_URL}\ncookiepath=${WEBMIN_URL}" >> /etc/webmin/miniserv.conf
-  sed -iE "s|/webmin|${WEBMIN_URL}|"                                   /etc/nginx/sites-enabled/default
-else
-  sed -i 's/webmin//' /etc/nginx/sites-enabled/default
-  sed -i '/rewrite/d' /etc/nginx/sites-enabled/default
-fi;
+  for SHARE in $(echo ${SHARES_LIST} | sed 's/,/ /g'); do
+    echo -e "[${SHARE}]\n    path = ${DATA_PATH}/${SHARE}\n" >> /etc/samba/smb.conf
+  done
+  echo -e "\n\n" >> /etc/samba/smb.conf
 
-if [[ "${REDIRECT_PORT}" != "" ]]; then
-  echo "redirect_port=${REDIRECT_PORT}" >> /etc/webmin/miniserv.conf
-else
-  echo "redirect_port=80"               >> /etc/webmin/miniserv.conf
+  # set predefined values
+  sed -i 's/referers_none=1/referers_none=0/' /etc/webmin/config
+  sed -i 's/10000/8080/'                      /etc/webmin/miniserv.conf
+  sed -i 's/ssl=1/ssl=0/'                     /etc/webmin/miniserv.conf
+
+  # clean up before set new values
+  sed -i '/webprefix=/d'         /etc/webmin/config
+  sed -i '/webprefixnoredir==/d' /etc/webmin/config
+  sed -i '/redirect_prefix=/d'   /etc/webmin/miniserv.conf
+  sed -i '/ncookiepath=/d'       /etc/webmin/miniserv.conf
+  sed -i '/redirect_port=/d'     /etc/webmin/miniserv.conf
+
+  if [[ "${WEBMIN_URL}" != "" ]]; then
+    echo -e "webprefix=${WEBMIN_URL}\nwebprefixnoredir=1"             >> /etc/webmin/config
+    echo -e "redirect_prefix=${WEBMIN_URL}\ncookiepath=${WEBMIN_URL}" >> /etc/webmin/miniserv.conf
+    sed -iE "s|/webmin|${WEBMIN_URL}|"                                   /etc/nginx/sites-enabled/default
+  else
+    sed -i 's/webmin//' /etc/nginx/sites-enabled/default
+    sed -i '/rewrite/d' /etc/nginx/sites-enabled/default
+  fi;
+
+  if [[ "${REDIRECT_PORT}" != "" ]]; then
+    echo "redirect_port=${REDIRECT_PORT}" >> /etc/webmin/miniserv.conf
+  else
+    echo "redirect_port=80"               >> /etc/webmin/miniserv.conf
+  fi
 fi
 
+# configure predefined users
+useradd -M -N -Groot,sambashare,users -u0 -o guest
+passwd -d guest
 echo root:${WEBMIN_PASSWORD} | chpasswd
 
 service nginx start
@@ -38,17 +70,23 @@ service webmin start
 service smbd start
 service nmbd start
 
-rm -rf /backup_configs/webmin_prev /backup_configs/samba_prev
-mv /backup_configs/webmin /backup_configs/webmin_prev 2>/dev/null
-mv /backup_configs/samba  /backup_configs/samba_prev 2>/dev/null
-cp -r /etc/webmin /backup_configs/
-cp -r /etc/samba  /backup_configs/
-
 while true; do
-   # check services
-   service webmin status || service webmin start
-   service nginx  status || service nginx  start
-   service smbd   status || service smbd   start
-   service nmbd   status || service nmbd   start
+   # check or start services
+   service webmin status >/dev/null || service webmin start
+   service nginx  status >/dev/null || service nginx  start
+   service smbd   status >/dev/null || service smbd   start
+   service nmbd   status >/dev/null || service nmbd   start
+   if [[ "$(date +'%Y.%m.%d_%H')" == "$(date +'%Y.%m.%d_00')" ]] && [[ ! -d /backup_configs/$(date +'%Y.%m.%d_00') ]]; then
+     echo "INFO: backing up configs"
+     # clean up old backups
+     find /backup_configs -type d -mtime +14 -delete
+     # make backups
+     DT=$(date +'%Y.%m.%d_%H.%M.%S')
+     mkdir -p /backup_configs/${DT}
+     cp -r /etc/webmin /backup_configs/${DT}/
+     cp -r /etc/samba  /backup_configs/${DT}/
+     cp -r /etc/nginx  /backup_configs/${DT}/
+     echo "INFO: backing up is done"
+   fi;
    sleep 5m
 done

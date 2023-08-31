@@ -5,6 +5,8 @@ EXPOSE 80 139 445
 ENV WEBMIN_PASSWORD=webmin
 ENV WEBMIN_URL=/
 ENV REDIRECT_PORT=80
+ENV DATA_PATH=/data
+ENV SHARES_LIST=PassingBy,InProgress,Processed
 
 # backup configs
 VOLUME /backup_configs
@@ -15,7 +17,7 @@ WORKDIR /
 
 RUN \
 apt-get update -qqq >/dev/null && \
-apt-get install apt-transport-https \
+apt-get install apt-transport-https apt-utils \
     curl \
     samba \
     samba-common \
@@ -33,5 +35,6 @@ chmod -R 777 /backup_configs /data
 
 COPY site.conf /etc/nginx/sites-enabled/default
 COPY entrypoint.sh /entrypoint.sh
+COPY smb.conf /etc/samba/smb.conf
 
 CMD [ "/bin/bash","/entrypoint.sh" ]

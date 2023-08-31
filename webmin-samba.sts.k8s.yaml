@@ -1,0 +1,193 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: webmin-samba
+  labels:
+    app.kubernetes.io/instance: webmin-samba
+    app.kubernetes.io/name: webmin-samba
+  annotations:
+    meta.helm.sh/release-name: webmin-samba
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: webmin-samba
+      app.kubernetes.io/name: webmin-samba
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/instance: webmin-samba
+        app.kubernetes.io/name: webmin-samba
+    spec:
+      containers:
+        - name: webmin-samba
+          image: kvvtest100/webmin-samba:31.08.2023
+          command:
+            - /bin/bash
+            - /entrypoint.sh
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: smb
+              containerPort: 139
+              protocol: TCP
+            - name: ntb
+              containerPort: 445
+              protocol: TCP
+          env:
+            - name: WEBMIN_PASSWORD
+              value: nifisamba
+            - name: WEBMIN_URL
+              value: /webmin
+            - name: REDIRECT_PORT
+              value: '80'
+            - name: DATA_PATH
+              value: /data
+            - name: SHARES_LIST
+              value: PassingBy,InProgress,Processed
+          resources:
+            limits:
+              cpu: '1'
+              memory: 1Gi
+            requests:
+              cpu: 1m
+              memory: 1Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: configs
+              mountPath: /backup_configs
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccountName: YOUR_NAMESPACE-sa-ns-admin
+      serviceAccount: YOUR_NAMESPACE-sa-ns-admin
+      securityContext:
+        fsGroup: 0
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: webmin-samba
+                    app.kubernetes.io/name: webmin-samba
+                namespaces:
+                  - YOUR_NAMESPACE
+                topologyKey: kubernetes.io/hostname
+      schedulerName: default-scheduler
+  volumeClaimTemplates:
+    - kind: PersistentVolumeClaim
+      apiVersion: v1
+      metadata:
+        name: data
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: webmin-samba
+          app.kubernetes.io/name: webmin-samba
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: yc-network-ssd
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+    - kind: PersistentVolumeClaim
+      apiVersion: v1
+      metadata:
+        name: configs
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: webmin-samba
+          app.kubernetes.io/name: webmin-samba
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: yc-network-ssd
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  serviceName: webmin-samba
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webmin-samba
+  labels:
+    app.kubernetes.io/instance: webmin-samba
+    app.kubernetes.io/name: webmin-samba
+  annotations:
+    meta.helm.sh/release-name: webmin-samba
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: http
+    - name: smb
+      protocol: TCP
+      port: 139
+      targetPort: smb
+    - name: ntb
+      protocol: TCP
+      port: 445
+      targetPort: ntb
+  selector:
+    app.kubernetes.io/instance: webmin-samba
+    app.kubernetes.io/name: webmin-samba
+  clusterIP: None
+  clusterIPs:
+    - None
+  type: ClusterIP
+  sessionAffinity: None
+  publishNotReadyAddresses: true
+  ipFamilies:
+    - IPv4
+  ipFamilyPolicy: SingleStack
+  internalTrafficPolicy: Cluster
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webmin-samba
+  labels:
+    app.kubernetes.io/name: webmin-samba
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1G
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '120'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - YOUR_HOSTNAME
+      secretName: YOUR_TLS_SECRET
+  rules:
+    - host: YOUR_HOSTNAME
+      http:
+        paths:
+          - path: /webmin
+            pathType: Prefix
+            backend:
+              service:
+                name: webmin-samba
+                port:
+                  name: http

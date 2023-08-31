@@ -13,3 +13,5 @@ services:
       - WEBMIN_PASSWORD=webmin1
       - WEBMIN_URL=/webmintest
       - REDIRECT_PORT=80
+      - DATA_PATH=/data
+      - SHARES_LIST=PassingBy,InProgress,Processed

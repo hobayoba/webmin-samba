@@ -19,3 +19,9 @@ To run this container all you need to do is pass port 80 on the host to port 80 
 
 Example: 
 `docker run -d -p 80:80 -p 139:139 -p 445:445 -v /path/on/host:/media/storage <image>`
+
+### Latest image
+
+```
+
+```
